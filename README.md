@@ -1,106 +1,146 @@
-# CognoDB Cloud vs. Managed Graph Databases: A Reproducible Benchmark
+# benchmark-graphdb
 
-A fair, scripted comparison of [CognoDB Cloud](https://console.cognodb.com) against four other managed/self-managed graph databases on the same dataset, same queries, same client, and matched resource tiers.
+Scripted, reproducible latency/throughput benchmark for **CognoDB Cloud**, run against the same IMDb-derived graph dataset that will also be used to test Neo4j Aura, self-hosted Neo4j+, Memgraph Cloud, Amazon Neptune, and ArangoDB Oasis under matched conditions.
 
-**TL;DR:** CognoDB Cloud (free tier) loaded and served the full 170k-node / 100k-edge IMDb dataset with stable ~264 ms median latency on point lookups and 1/2/3-hop traversals, and ~1.38s median on full aggregation scans. Throughput scaled from 3.27 qps at concurrency 1 to 70.67 qps at concurrency 40, with tail latency (p95) rising sharply to ~1.1s at the highest concurrency level. This run only covers CognoDB — Neo4j Aura, Neo4j+, Memgraph, Neptune, and ArangoDB have not yet been benchmarked (see §9).
+> **Status:** CognoDB Cloud run complete. Other four platforms not yet benchmarked — this repo is built so each one drops into the same tables the moment credentials are added to `.env`.
 
 ---
 
-## 1. Databases compared
+## Why this exists
 
-| Platform | Query language | Why it's in this comparison |
-|---|---|---|
-| **CognoDB Cloud** (c0 free) | Cypher (Bolt) | The subject of the benchmark. |
-| **Neo4j Aura Free** | Cypher (Bolt) | The most direct comparator — same query language and wire protocol as CognoDB, so any latency gap reflects the backend, not syntax or driver differences. |
-| **Neo4j+** (self-managed, Docker-capped) | Cypher (Bolt) | Same engine as Aura but self-hosted and explicitly resource-capped (`docker-compose.neo4j-plus.yml`) to CognoDB's exact 0.5 vCPU / 256MB / 1GB spec — isolates "managed service overhead" from "raw engine performance." |
-| **Memgraph Cloud** | Cypher (Bolt) | Also Cypher/Bolt, but an in-memory-first architecture — a genuine architectural contrast rather than another Neo4j-family engine. |
-| **Amazon Neptune** (Serverless, min capacity) | openCypher (HTTPS) | A major managed graph offering with no free tier — included to test the harness against a different wire protocol (HTTPS + optional SigV4) and to make the resource-parity trade-off explicit. |
-| **ArangoDB Oasis** | AQL | A different query language and multi-model engine, included for breadth. Its free trial tier is larger than CognoDB's (see §4) — treat its raw numbers as directional unless run alongside the capped self-hosted variant. |
+Graph database vendors publish their own benchmarks, on their own hardware, with their own queries. This repo does the opposite: one dataset, one set of query templates, one client, and — as much as free tiers allow — matched CPU/RAM/storage, so the numbers in §5 are actually comparable to each other instead of just comparable to marketing pages.
 
-Four of five comparators share Cypher-over-Bolt with CognoDB, which lets the harness reuse one query template for most platforms (`src/workloads.py`) — maximizing confidence that "same logical query" really means the same query, not a best-effort translation.
+## At a glance
 
-## 2. Repository layout
+- **Engine under test:** CognoDB Cloud, `c0` free tier (0.5 vCPU / 256 MB RAM / 1 GB storage)
+- **Comparators queued:** Neo4j Aura Free, Neo4j+ (self-hosted, resource-capped to match CognoDB), Memgraph Cloud, Amazon Neptune Serverless, ArangoDB Oasis
+- **Dataset:** IMDb non-commercial data → 170,490 nodes / 99,989 `ACTED_IN` edges
+- **Query surface:** ingest, 1/2/3-hop traversal, point lookup, indexed lookup, aggregation, mixed 80/20 read-write sweep, storage footprint
+- **This run's headline numbers:** ~264 ms median for lookups/traversals, ~1.38 s median for full-scan aggregation, 3.27 → 70.67 qps across the concurrency sweep (1 → 40 clients), p95 climbing to ~1.1 s at the top end
+
+---
+
+## 1. Platforms
+
+| # | Platform | Protocol / language | Role in the comparison |
+|---|---|---|---|
+| 1 | **CognoDB Cloud** (free) | Bolt / Cypher | Subject of the benchmark |
+| 2 | Neo4j Aura (free) | Bolt / Cypher | Nearest apples-to-apples comparator — identical wire protocol and query language |
+| 3 | Neo4j+ (self-hosted, Docker) | Bolt / Cypher | Same engine as #2, but hardware-capped to CognoDB's exact spec via `docker-compose.neo4j-plus.yml` — isolates "managed overhead" from "engine performance" |
+| 4 | Memgraph Cloud | Bolt / Cypher | In-memory-first architecture — a real design contrast, not just another Neo4j clone |
+| 5 | Amazon Neptune (Serverless, min NCU) | HTTPS / openCypher | No free tier, included anyway to stress-test the harness against a different transport and to be transparent about the resource mismatch |
+| 6 | ArangoDB Oasis (trial) | AQL | Different query language and multi-model engine; trial tier is larger than CognoDB's, so treat its numbers as directional, not matched |
+
+Five of six speak Cypher over Bolt, which was deliberate — it lets one query template (`src/workloads.py`) cover most platforms, so "same query" isn't a translation exercise.
+
+## 2. Layout
 
 ```
-config/platforms.yaml          Platform registry: adapter type, credentials env-var prefix, advertised specs
+config/platforms.yaml            adapter type + env-var prefix + advertised specs, per platform
 src/
-  config.py                    Loads platforms.yaml + .env
-  adapters/                    One adapter per wire protocol/dialect (base.py defines the interface)
-    cypher_bolt_adapter.py     CognoDB, Neo4j Aura, Neo4j+, Memgraph (identical Cypher/Bolt)
-    neptune_adapter.py         Amazon Neptune (openCypher over HTTPS)
-    arango_adapter.py          ArangoDB (AQL)
-  dataset_prep.py              Builds the sized movie/actor dataset from public IMDb data
-  loader.py                    Streams the dataset into any adapter, times ingest throughput
-  workloads.py                 Query templates for every required metric, per dialect
-  runner.py                    Warm-up, latency percentiles, mixed-workload concurrency sweep
-  metrics.py                   Percentile/statistics helpers (unit-tested, see tests/)
+├─ config.py                     loads platforms.yaml + .env
+├─ adapters/
+│  ├─ base.py                    shared adapter interface
+│  ├─ cypher_bolt_adapter.py     CognoDB / Aura / Neo4j+ / Memgraph
+│  ├─ neptune_adapter.py         openCypher over HTTPS
+│  └─ arango_adapter.py          AQL
+├─ dataset_prep.py               builds the sized dataset from raw IMDb files
+├─ loader.py                     batched ingest + throughput timing
+├─ workloads.py                  one query template per metric, per dialect
+├─ runner.py                     warm-up, percentiles, concurrency sweep
+└─ metrics.py                    percentile math (unit-tested)
 scripts/
-  run_all.py                   One-command benchmark runner across all configured platforms
-  generate_readme_tables.py    Turns results/results.json into the markdown tables in §7
-docker-compose.neo4j-plus.yml  Resource-capped self-managed Neo4j+ instance
-tests/test_metrics.py          Unit tests for the percentile math
-results/                       JSON output per platform + combined results.json (gitignored except .gitkeep)
+├─ run_all.py                    runs every configured platform in one command
+└─ generate_readme_tables.py     results.json → the markdown tables in §5
+docker-compose.neo4j-plus.yml    resource-capped self-hosted Neo4j
+tests/test_metrics.py
+results/                         per-platform JSON + combined results.json (gitignored)
 ```
 
 ## 3. Dataset
 
-**Source:** [IMDb non-commercial datasets](https://datasets.imdbws.com/) (free for personal/non-commercial use, updated daily by IMDb — see [terms](https://www.imdb.com/interfaces/)).
+Sourced from the [IMDb non-commercial datasets](https://datasets.imdbws.com/) ([terms](https://www.imdb.com/interfaces/)), shaped as:
 
-**Graph shape:** `(:Person)-[:ACTED_IN {ordering, category}]->(:Movie {year, genres, runtime_minutes})`
+```
+(:Person)-[:ACTED_IN {ordering, category}]->(:Movie {year, genres, runtime_minutes})
+```
 
-Built by `src/dataset_prep.py`, which:
-1. Downloads `title.basics.tsv.gz`, `name.basics.tsv.gz`, `title.principals.tsv.gz`.
-2. Filters to `titleType=movie` with a known release year, and credits with `category in {actor, actress}`.
-3. Samples ACTED_IN edges down to a target within the assignment's **100,000–500,000 relationship** range (default target: 250,000), then keeps only the Movie/Person rows actually referenced by the sampled edges — no orphaned nodes.
-4. Writes `data/processed/{movies.csv, persons.csv, acted_in.csv}` — the single source of truth every platform loader reads, guaranteeing an identical dataset rather than five independent downloads that might drift.
+`src/dataset_prep.py` downloads `title.basics`, `name.basics`, and `title.principals`, filters to movies with a known year and `actor`/`actress` credits, then samples edges down into the assignment's 100k–500k relationship band (default target 250k) and drops any node not referenced by a sampled edge. Output goes to `data/processed/{movies,persons,acted_in}.csv` — one file set every adapter loads from, so all five platforms see byte-identical data.
 
-**This run's dataset:**
+**This run:**
 
-| Metric | Count |
-|---|---|
+| | Count |
+|---|---:|
 | Movies | 90,172 |
 | Persons | 80,318 |
-| ACTED_IN relationships | 99,989 |
+| ACTED_IN edges | 99,989 |
 | Total nodes | 170,490 |
 
-**Load method (identical across platforms):** driver-side batched `UNWIND`/AQL bulk insert via `src/loader.py`, batch size 2000 rows, nodes first then edges (edges matched to already-created nodes by id). No platform-specific bulk-import tool was used, so the load numbers measure driver-batched ingest specifically — native bulk tools (e.g. `neo4j-admin import`) were intentionally excluded to keep the load *method* identical across platforms, not just the data.
+**Ingest method** is identical everywhere: driver-side `UNWIND` (or AQL bulk insert), batches of 2,000 rows, nodes before edges. Native bulk-import tools (`neo4j-admin import`, etc.) were deliberately skipped so the *method*, not just the data, stays constant across platforms.
 
-## 4. Fairness: resource parity
+## 4. Fairness notes
 
-| Platform | vCPU | RAM | Storage | Region | Caveats |
-|---|---|---|---|---|---|
-| CognoDB Cloud | 0.5 (burstable) | 256 MB | 1 GB | *(fill in region picked)* | Baseline tier — every other platform is matched or capped to this. |
-| Neo4j Aura Free | shared, not published | 1 GB | ~0.5 GB usable | *(fill in)* | RAM is 4x CognoDB's — documented, not hidden; Aura Free also auto-pauses after inactivity, excluded from cold-start numbers unless noted. |
-| Neo4j+ (self-managed) | 0.5 (container-capped) | 256 MB (container-capped) | 1 GB (volume-capped) | same client region | Exact match to CognoDB by construction (`docker-compose.neo4j-plus.yml`) — the strongest fairness data point in this comparison. |
-| Memgraph Cloud | *(fill in from console at run time)* | *(fill in)* | *(fill in)* | *(fill in)* | In-memory engine is an architectural difference independent of the resource tier — call this out in the analysis, don't let it read as an unfair advantage. |
-| Amazon Neptune | min Neptune Capacity Units (NCU) | not published per-NCU | pay-per-GB (uncapped) | must match client region | **No free tier — the clearest resource-parity violation in the set.** Included anyway per the assignment's "your choice" latitude, with this caveat stated up front. |
-| ArangoDB Oasis | 2 (free trial) | 4 GB (free trial) | 10 GB (free trial) | *(fill in)* | Free trial tier is materially larger than CognoDB's. Numbers here are **not resource-matched** — treat as directional. |
+Matching hardware across five different vendors' free tiers is only ever approximate — here's exactly where it does and doesn't hold:
 
-**Dataset sizing:** the dataset is sized (100k–500k relationships, ~250k default) so it fits inside CognoDB's 1GB free tier, per the assignment's fairness note — the same dataset is loaded everywhere, so no platform benefits from a smaller effective working set.
+- **Neo4j+** is the strongest data point: it's the same Neo4j engine as Aura, but Docker-capped to CognoDB's precise 0.5 vCPU / 256 MB / 1 GB. Any gap between Neo4j+ and CognoDB is close to a clean read on engine performance.
+- **Neo4j Aura Free** ships ~4x CognoDB's RAM and auto-pauses after inactivity — both noted rather than hidden, and cold-start numbers are excluded unless flagged.
+- **Memgraph** is in-memory by design, which is an architectural choice independent of its resource tier — a Memgraph win shouldn't be read as "CognoDB is just under-provisioned."
+- **Amazon Neptune has no free tier at all** — the one clear resource-parity violation in the set. Included anyway per the assignment's latitude on platform choice, with the caveat stated up front instead of buried.
+- **ArangoDB Oasis's trial tier (2 vCPU / 4 GB / 10 GB)** dwarfs CognoDB's. Its numbers are directional only unless paired with a capped self-hosted run.
+- The dataset itself (100k–500k relationships) was deliberately sized to fit inside CognoDB's 1 GB tier, so no platform benefits from a smaller working set than any other.
 
-## 5. Methodology
+## 5. Results — CognoDB Cloud
 
-- **Same dataset, same queries, same client, matched resources** (§4) for every platform.
-- **Warm-up:** 20 unmeasured calls per read workload before the 100 measured iterations (both configurable via `.env`: `BENCH_WARMUP_ITERATIONS`, `BENCH_ITERATIONS`).
-- **Percentiles, not just averages:** every read workload reports p50/p95/p99 (`src/metrics.py`, unit-tested in `tests/test_metrics.py`).
-- **Mixed workload concurrency sweep:** 1 / 10 / 40 concurrent clients (`BENCH_CONCURRENCY_LEVELS`), 80/20 read/write mix, 15s sustained load per level, one connection per worker thread (`src/runner.py::run_mixed_workload`).
-- **Automation:** `python scripts/run_all.py` loads data, runs every workload, and writes `results/results.json` for every configured platform in one command. `scripts/generate_readme_tables.py` turns that JSON into the tables in §7 — the tables are generated, not hand-typed, so they can't silently drift from the raw numbers.
-- **Query correspondence across dialects:** `src/workloads.py` documents each workload's logical intent once, then gives the Cypher and AQL implementations side by side, so a reviewer can verify they're really the same query and not just similarly named.
+*Auto-generated by `scripts/generate_readme_tables.py`. Rows for the remaining five platforms will appear here once benchmarked — see §7.*
 
-### Required metrics → where they're implemented
+**Ingest**
 
-| Metric (assignment §5.2) | Implementation |
+| Nodes/sec | Rels/sec | Total load time |
+|---:|---:|---:|
+| 2,324.2 | 1,729.7 | 131.17 s |
+
+**Traversal latency, ms (p50 / p95, n=100)**
+
+| 1-hop | 2-hop | 3-hop |
+|---|---|---|
+| 264.25 / 267.19 | 264.14 / 274.70 | 264.24 / 283.61 |
+
+**Lookup latency, ms (p50 / p95, n=100)**
+
+| Point lookup | Indexed/filtered lookup |
 |---|---|
-| Ingest throughput | `src/loader.py::load_all` — nodes/sec, rels/sec, wall-clock |
-| 1/2/3-hop traversal latency | `workloads.py::traversal_1hop/2hop/3hop`, p50/p95 via `runner.py` |
-| Point lookup / indexed lookup | `workloads.py::point_lookup`, `indexed_filtered_lookup` (year is indexed on every platform that supports index DDL — Neptune auto-indexes, see adapter notes) |
-| Aggregation | `workloads.py::aggregation_by_category` — count grouped by ACTED_IN.category |
-| Mixed read/write throughput | `runner.py::run_mixed_workload`, swept at 1/10/40 clients |
-| Footprint | `adapters/*.py::footprint()` — reports node/rel counts everywhere; storage/memory reported as "not observable via driver" where a platform doesn't expose it through Cypher/AQL, with a pointer to check the provider console manually |
+| 264.28 / 280.43 | 279.40 / 856.13 |
 
-## 6. Reproducing this benchmark
+*Indexed properties: `movie_id`, `person_id`, `year`.*
 
-**Prerequisites:** Python 3.11+, free/trial accounts on each platform in §1, Docker (for Neo4j+).
+**Aggregation latency, ms (p50 / p95, n=100)**
+
+| Count-by-category |
+|---|
+| 1,382.62 / 1,631.94 |
+
+**Mixed workload — 80/20 read/write sweep**
+
+| Concurrency | Throughput | p95 latency |
+|---:|---:|---:|
+| 1 | 3.27 qps | 300.54 ms |
+| 10 | 33.93 qps | 317.69 ms |
+| 40 | 70.67 qps | 1,105.65 ms |
+
+**Footprint**
+
+| Nodes | Relationships | Storage/memory |
+|---:|---:|---|
+| 170,490 | 99,989 | not exposed via Cypher driver |
+
+## 6. Reading the results
+
+- **Lookups and traversals cluster tightly around 264 ms**, regardless of hop count — on a dataset this size, fixed per-query round-trip cost dominates over actual traversal depth. Don't read the flat 1/2/3-hop numbers as "CognoDB handles deep traversals for free"; it likely means the query time is latency-bound, not compute-bound, at this scale.
+- **Aggregation is the outlier**, ~5x slower than lookups, because `count-by-category` has to scan every `ACTED_IN` edge rather than hit an index.
+- **Concurrency scaling is real but not free**: throughput goes up 21x from 1→40 clients, but p95 latency goes up almost 4x in the same step — the 0.5 vCPU ceiling on the free tier is visibly the limiting factor once load gets heavy.
+- All of the above describes **CognoDB in isolation**. None of it is a comparative claim yet — that's what §7 is blocked on.
+
+## 7. Reproducing / extending this benchmark
 
 ```bash
 git clone <this-repo-url>
@@ -108,91 +148,31 @@ cd benchmark-graphdb
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env
-# Fill in .env with your own connection details for each platform.
-# Never commit .env — it's gitignored.
+cp .env.example .env        # fill in per-platform credentials; never commit this file
 
-# 1. Bring up the resource-capped self-managed Neo4j+ instance
-docker compose -f docker-compose.neo4j-plus.yml up -d
+docker compose -f docker-compose.neo4j-plus.yml up -d   # bring up capped self-hosted Neo4j+
+python src/dataset_prep.py                              # one-time, ~1.5 GB IMDb download
 
-# 2. Build the dataset (one-time, ~1.5GB download from IMDb)
-python src/dataset_prep.py
+python scripts/run_all.py                    # every configured platform
+python scripts/run_all.py --only cognodb memgraph_cloud # or just a subset
 
-# 3. Run the full benchmark suite across every configured platform
-python scripts/run_all.py
-# or a subset while iterating: python scripts/run_all.py --only cognodb memgraph_cloud
-
-# 4. Generate the results tables
 python scripts/generate_readme_tables.py > results/tables.md
-# paste results/tables.md into section 7 below
 ```
 
-Any platform without credentials in `.env` is automatically skipped (not failed) and marked accordingly in `results.json`, so you can run the suite incrementally as you provision each account.
+Platforms missing credentials in `.env` are skipped automatically (not failed) and marked as such in `results.json` — the suite can be run incrementally as accounts get provisioned.
 
-## 7. Results
+**Requires:** Python 3.11+, Docker (for Neo4j+), and a free/trial account on whichever platforms you're adding.
 
-*Generated by `scripts/generate_readme_tables.py` — CognoDB Cloud only. Other platforms will populate their own rows once benchmarked (see §9).*
+## 8. Open items
 
-### Data loading
-
-| Platform | Nodes/sec | Rels/sec | Total load time | Notes |
-|---|---|---|---|---|
-| CognoDB Cloud (c0 free) | 2324.2 | 1729.7 | 131.168s | Free tier (0.5 vCPU, 256 MB RAM) |
-
-### Traversals (p50 / p95, n=100)
-
-| Platform | 1-hop | 2-hop | 3-hop |
-|---|---|---|---|
-| CognoDB Cloud (c0 free) | 264.25 / 267.19 ms | 264.14 / 274.70 ms | 264.24 / 283.61 ms |
-
-### Lookups (p50 / p95, n=100)
-
-| Platform | Point lookup | Indexed/filtered lookup | Indexed properties |
-|---|---|---|---|
-| CognoDB Cloud (c0 free) | 264.28 / 280.43 ms | 279.40 / 856.13 ms | movie_id, person_id, year |
-
-### Aggregation (p50 / p95, n=100)
-
-| Platform | Count-by-category |
-|---|---|
-| CognoDB Cloud (c0 free) | 1382.62 / 1631.94 ms |
-
-### Mixed workload (80/20 read/write, concurrency sweep)
-
-| Platform | Concurrency | Throughput | p95 latency |
-|---|---|---|---|
-| CognoDB Cloud (c0 free) | 1 | 3.27 qps | 300.54 ms |
-| CognoDB Cloud (c0 free) | 10 | 33.93 qps | 317.69 ms |
-| CognoDB Cloud (c0 free) | 40 | 70.67 qps | 1105.65 ms |
-
-### Footprint
-
-| Platform | Node count | Rel count | Storage/memory |
-|---|---|---|---|
-| CognoDB Cloud (c0 free) | 170,490 | 99,989 | Not exposed via Cypher driver |
-
-## 8. Analysis
-
-**Performance summary.** CognoDB Cloud successfully loaded 170,490 nodes and 99,989 relationships using the same dataset and workload definitions used throughout the benchmark.
-
-**Read performance.** Point lookups and traversal workloads showed stable median latency around 264 ms. The 1-hop, 2-hop, and 3-hop traversals performed similarly, suggesting the traversal cost on this dataset size is dominated by fixed per-query overhead (connection/round-trip) rather than hop depth.
-
-**Aggregation performance.** Aggregation queries were significantly more expensive than lookups and traversals, with median latency above 1.3 seconds — expected, since the query scans and groups all ACTED_IN relationships.
-
-**Mixed workload.** Throughput increased from 3.27 qps at concurrency 1 to 70.67 qps at concurrency 40. Higher concurrency increased throughput but also increased tail latency, with p95 reaching roughly 1.1 seconds at the highest concurrency level — consistent with the free tier's 0.5 vCPU limit becoming the bottleneck under load.
-
-**Limitations.** Results were collected entirely on the CognoDB free tier (0.5 vCPU, 256 MB RAM). Network latency and free-tier resource limits may affect results. Only one platform has been benchmarked so far; the comparison against Neo4j Aura, Neo4j+, Memgraph, Neptune, and ArangoDB is still outstanding (§9).
-
-## 9. Known caveats / outstanding work
-
-- [ ] Benchmark Neo4j Aura Free, Neo4j+, Memgraph Cloud, Amazon Neptune, and ArangoDB Oasis and populate their rows in §7.
-- [ ] Free-tier throttling observed on: *(platform, symptom, workaround)*
-- [ ] Network variance: *(client region vs. each platform's region, if not identical)*
-- [ ] Any failed/timed-out runs and how they were handled
-- [ ] Query-language differences beyond what's captured in `workloads.py` (e.g. Neptune openCypher quirks vs. Neo4j Cypher)
-- [ ] Aura Free auto-pause affecting any cold-start numbers
-- [ ] Whether the supplementary capped self-hosted ArangoDB run was included alongside the uncapped Oasis trial numbers
+- [ ] Run Aura Free, Neo4j+, Memgraph Cloud, Neptune, and ArangoDB Oasis; populate their rows in §5
+- [ ] Log any free-tier throttling per platform (symptom + workaround)
+- [ ] Note client-region vs. platform-region mismatches, if any
+- [ ] Document failed/timed-out runs and how they were handled
+- [ ] Capture dialect quirks not already covered in `workloads.py` (e.g. Neptune's openCypher vs. Neo4j's Cypher)
+- [ ] Flag any Aura cold-start numbers caused by auto-pause
+- [ ] Decide whether to report the capped self-hosted ArangoDB run alongside the uncapped Oasis trial
 
 ---
 
-**License/attribution:** IMDb dataset used under IMDb's non-commercial terms (https://www.imdb.com/interfaces/). This is a technical benchmark, not an endorsement of any platform.
+*Dataset used under IMDb's non-commercial terms: https://www.imdb.com/interfaces/. This is a technical benchmark, not an endorsement of any vendor.*
