@@ -1,0 +1,37 @@
+# Self-managed Neo4j Community instance, deliberately capped to the same
+# resources as CognoDB's free c0 tier (0.5 vCPU / 256MB RAM / 1GB disk).
+# This is "Neo4j+" in config/platforms.yaml: the same database engine as
+# Aura, but self-hosted so we control the resource cap exactly rather than
+# trusting a managed tier's published (and sometimes bursty) numbers.
+#
+# Usage:
+#   docker compose -f docker-compose.neo4j-plus.yml up -d
+#   Set NEO4J_PLUS_URI=bolt://localhost:7687 in .env (or the host's
+#   reachable address if the client runs elsewhere - see the fairness note
+#   in the README about same-region/same-client-machine requirements).
+
+services:
+  neo4j-plus:
+    image: neo4j:5.24-community
+    container_name: neo4j-plus-benchmark
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PLUS_PASSWORD:-benchmarkpassword}
+      - NEO4J_server_memory_heap_max__size=200m
+      - NEO4J_server_memory_pagecache_size=32m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    volumes:
+      - neo4j_plus_data:/data
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 1073741824  # 1GB cap, matching CognoDB's 1GB disk tier
+
+volumes:
+  neo4j_plus_data:

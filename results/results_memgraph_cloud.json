@@ -1,0 +1,139 @@
+{
+  "platform": "memgraph_cloud",
+  "display_name": "Memgraph Cloud",
+  "advertised_specs": {
+    "vcpu": "shared entry tier (record actual value from console at run time)",
+    "ram": "record actual value from console at run time",
+    "storage": "record actual value from console at run time",
+    "region": "user-selected at signup",
+    "notes": "Uses Cypher over Bolt; in-memory engine by default which is a real architectural difference worth calling out in the analysis, not hidden."
+  },
+  "query_dialect": "cypher",
+  "load": {
+    "nodes_loaded": 170490,
+    "edges_loaded": 100000,
+    "node_load_seconds": 55.4,
+    "edge_load_seconds": 39.041,
+    "total_load_seconds": 94.441,
+    "nodes_per_second": 3077.4,
+    "edges_per_second": 2561.4
+  },
+  "reads": {
+    "traversal_1hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return the Movies they acted in (1 hop).",
+      "n": 100,
+      "p50_ms": 83.95,
+      "p95_ms": 84.882,
+      "p99_ms": 85.681,
+      "mean_ms": 84.13,
+      "min_ms": 83.001,
+      "max_ms": 99.368
+    },
+    "traversal_2hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars.",
+      "n": 100,
+      "p50_ms": 83.945,
+      "p95_ms": 120.434,
+      "p99_ms": 124.516,
+      "mean_ms": 88.815,
+      "min_ms": 83.065,
+      "max_ms": 124.836
+    },
+    "traversal_3hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars' other movies.",
+      "n": 100,
+      "p50_ms": 83.978,
+      "p95_ms": 90.669,
+      "p99_ms": 100.47,
+      "mean_ms": 84.902,
+      "min_ms": 82.827,
+      "max_ms": 106.309
+    },
+    "point_lookup": {
+      "category": "Lookups",
+      "description": "Exact-match lookup of a single Movie by movie_id.",
+      "n": 100,
+      "p50_ms": 83.898,
+      "p95_ms": 85.007,
+      "p99_ms": 89.887,
+      "mean_ms": 84.102,
+      "min_ms": 83.216,
+      "max_ms": 93.27
+    },
+    "indexed_filtered_lookup": {
+      "category": "Lookups",
+      "description": "Movies released in a given year.",
+      "n": 100,
+      "p50_ms": 96.289,
+      "p95_ms": 301.759,
+      "p99_ms": 316.827,
+      "mean_ms": 113.031,
+      "min_ms": 82.53,
+      "max_ms": 320.573
+    },
+    "aggregation_by_category": {
+      "category": "Aggregations",
+      "description": "Count ACTED_IN edges grouped by category.",
+      "n": 100,
+      "p50_ms": 165.282,
+      "p95_ms": 170.187,
+      "p99_ms": 175.07,
+      "mean_ms": 165.975,
+      "min_ms": 162.921,
+      "max_ms": 181.698
+    }
+  },
+  "footprint": {
+    "observable": true,
+    "nodeCount": 0,
+    "relCount": null,
+    "note": "APOC statistics"
+  },
+  "mixed_workload": {
+    "1": {
+      "concurrency": 1,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 175,
+      "throughput_qps": 11.67,
+      "n": 175,
+      "p50_ms": 83.127,
+      "p95_ms": 86.084,
+      "p99_ms": 95.052,
+      "mean_ms": 83.633,
+      "min_ms": 82.039,
+      "max_ms": 107.47
+    },
+    "10": {
+      "concurrency": 10,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 1783,
+      "throughput_qps": 118.87,
+      "n": 1783,
+      "p50_ms": 80.441,
+      "p95_ms": 89.138,
+      "p99_ms": 91.852,
+      "mean_ms": 81.756,
+      "min_ms": 78.838,
+      "max_ms": 100.629
+    },
+    "40": {
+      "concurrency": 40,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 7141,
+      "throughput_qps": 476.07,
+      "n": 7141,
+      "p50_ms": 80.431,
+      "p95_ms": 86.177,
+      "p99_ms": 98.541,
+      "mean_ms": 81.291,
+      "min_ms": 74.834,
+      "max_ms": 116.59
+    }
+  }
+}

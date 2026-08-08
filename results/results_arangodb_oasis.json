@@ -1,0 +1,138 @@
+{
+  "platform": "arangodb_oasis",
+  "display_name": "ArangoDB Oasis (free trial)",
+  "advertised_specs": {
+    "vcpu": "2 (Oasis free trial entry node, verify at signup time)",
+    "ram": "4 GB (Oasis free trial entry node, verify at signup time)",
+    "storage": "10 GB (Oasis free trial entry node, verify at signup time)",
+    "region": "user-selected at signup",
+    "notes": "Free trial is intentionally larger than CognoDB's c0 tier - documented as a fairness caveat; consider also running self-hosted ArangoDB capped to 256MB/0.5vCPU as an apples-to-apples supplementary run."
+  },
+  "query_dialect": "aql",
+  "load": {
+    "nodes_loaded": 170490,
+    "edges_loaded": 100000,
+    "node_load_seconds": 33.433,
+    "edge_load_seconds": 15.401,
+    "total_load_seconds": 48.834,
+    "nodes_per_second": 5099.5,
+    "edges_per_second": 6493.2
+  },
+  "reads": {
+    "traversal_1hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return the Movies they acted in (1 hop).",
+      "n": 100,
+      "p50_ms": 49.616,
+      "p95_ms": 68.439,
+      "p99_ms": 99.304,
+      "mean_ms": 52.65,
+      "min_ms": 48.429,
+      "max_ms": 101.361
+    },
+    "traversal_2hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars.",
+      "n": 100,
+      "p50_ms": 49.75,
+      "p95_ms": 70.497,
+      "p99_ms": 100.912,
+      "mean_ms": 53.02,
+      "min_ms": 47.784,
+      "max_ms": 113.308
+    },
+    "traversal_3hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars' other movies.",
+      "n": 100,
+      "p50_ms": 49.806,
+      "p95_ms": 63.893,
+      "p99_ms": 67.893,
+      "mean_ms": 51.097,
+      "min_ms": 48.952,
+      "max_ms": 69.226
+    },
+    "point_lookup": {
+      "category": "Lookups",
+      "description": "Exact-match lookup of a single Movie by movie_id.",
+      "n": 100,
+      "p50_ms": 49.527,
+      "p95_ms": 60.669,
+      "p99_ms": 66.532,
+      "mean_ms": 50.643,
+      "min_ms": 48.579,
+      "max_ms": 69.15
+    },
+    "indexed_filtered_lookup": {
+      "category": "Lookups",
+      "description": "Movies released in a given year.",
+      "n": 100,
+      "p50_ms": 52.043,
+      "p95_ms": 155.309,
+      "p99_ms": 160.894,
+      "mean_ms": 63.423,
+      "min_ms": 48.16,
+      "max_ms": 161.08
+    },
+    "aggregation_by_category": {
+      "category": "Aggregations",
+      "description": "Count ACTED_IN edges grouped by category.",
+      "n": 100,
+      "p50_ms": 103.619,
+      "p95_ms": 213.55,
+      "p99_ms": 297.394,
+      "mean_ms": 131.052,
+      "min_ms": 71.484,
+      "max_ms": 297.765
+    }
+  },
+  "footprint": {
+    "observable": true,
+    "nodeCount": 170490,
+    "relCount": 100000
+  },
+  "mixed_workload": {
+    "1": {
+      "concurrency": 1,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 277,
+      "throughput_qps": 18.47,
+      "n": 277,
+      "p50_ms": 50.269,
+      "p95_ms": 69.455,
+      "p99_ms": 101.395,
+      "mean_ms": 53.499,
+      "min_ms": 48.331,
+      "max_ms": 128.426
+    },
+    "10": {
+      "concurrency": 10,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 2462,
+      "throughput_qps": 164.13,
+      "n": 2462,
+      "p50_ms": 51.259,
+      "p95_ms": 99.427,
+      "p99_ms": 117.715,
+      "mean_ms": 60.31,
+      "min_ms": 45.621,
+      "max_ms": 180.981
+    },
+    "40": {
+      "concurrency": 40,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 7378,
+      "throughput_qps": 491.87,
+      "n": 7378,
+      "p50_ms": 77.173,
+      "p95_ms": 123.873,
+      "p99_ms": 158.779,
+      "mean_ms": 80.268,
+      "min_ms": 45.44,
+      "max_ms": 227.572
+    }
+  }
+}

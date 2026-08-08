@@ -1,0 +1,139 @@
+{
+  "platform": "neo4j_aura_free",
+  "display_name": "Neo4j Aura Free",
+  "advertised_specs": {
+    "vcpu": "shared (not published as a fixed core count)",
+    "ram": "1 GB",
+    "storage": "~0.5 GB usable (Aura Free 2024 spec, verify at time of run)",
+    "region": "user-selected at signup",
+    "notes": "Free tier auto-pauses after inactivity; excluded from cold-start comparisons unless noted."
+  },
+  "query_dialect": "cypher",
+  "load": {
+    "nodes_loaded": 170490,
+    "edges_loaded": 100000,
+    "node_load_seconds": 47.209,
+    "edge_load_seconds": 31.263,
+    "total_load_seconds": 78.472,
+    "nodes_per_second": 3611.4,
+    "edges_per_second": 3198.6
+  },
+  "reads": {
+    "traversal_1hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return the Movies they acted in (1 hop).",
+      "n": 100,
+      "p50_ms": 109.872,
+      "p95_ms": 115.065,
+      "p99_ms": 314.656,
+      "mean_ms": 114.613,
+      "min_ms": 108.171,
+      "max_ms": 317.654
+    },
+    "traversal_2hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars.",
+      "n": 100,
+      "p50_ms": 110.093,
+      "p95_ms": 112.2,
+      "p99_ms": 115.385,
+      "mean_ms": 110.097,
+      "min_ms": 106.993,
+      "max_ms": 115.769
+    },
+    "traversal_3hop": {
+      "category": "Traversals",
+      "description": "From a random Person, return co-stars' other movies.",
+      "n": 100,
+      "p50_ms": 109.768,
+      "p95_ms": 115.164,
+      "p99_ms": 132.623,
+      "mean_ms": 110.914,
+      "min_ms": 106.944,
+      "max_ms": 166.453
+    },
+    "point_lookup": {
+      "category": "Lookups",
+      "description": "Exact-match lookup of a single Movie by movie_id.",
+      "n": 100,
+      "p50_ms": 110.31,
+      "p95_ms": 112.575,
+      "p99_ms": 116.188,
+      "mean_ms": 110.654,
+      "min_ms": 108.037,
+      "max_ms": 133.919
+    },
+    "indexed_filtered_lookup": {
+      "category": "Lookups",
+      "description": "Movies released in a given year.",
+      "n": 100,
+      "p50_ms": 124.985,
+      "p95_ms": 267.277,
+      "p99_ms": 281.055,
+      "mean_ms": 137.883,
+      "min_ms": 107.501,
+      "max_ms": 282.064
+    },
+    "aggregation_by_category": {
+      "category": "Aggregations",
+      "description": "Count ACTED_IN edges grouped by category.",
+      "n": 100,
+      "p50_ms": 178.443,
+      "p95_ms": 198.86,
+      "p99_ms": 210.308,
+      "mean_ms": 181.452,
+      "min_ms": 173.445,
+      "max_ms": 231.461
+    }
+  },
+  "footprint": {
+    "observable": true,
+    "nodeCount": 170490,
+    "relCount": 99989,
+    "note": "APOC statistics"
+  },
+  "mixed_workload": {
+    "1": {
+      "concurrency": 1,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 128,
+      "throughput_qps": 8.53,
+      "n": 128,
+      "p50_ms": 107.819,
+      "p95_ms": 114.551,
+      "p99_ms": 133.03,
+      "mean_ms": 111.205,
+      "min_ms": 105.637,
+      "max_ms": 387.349
+    },
+    "10": {
+      "concurrency": 10,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 1282,
+      "throughput_qps": 85.47,
+      "n": 1282,
+      "p50_ms": 108.025,
+      "p95_ms": 126.531,
+      "p99_ms": 180.822,
+      "mean_ms": 111.011,
+      "min_ms": 103.395,
+      "max_ms": 205.012
+    },
+    "40": {
+      "concurrency": 40,
+      "read_write_mix": "80/19",
+      "duration_seconds": 15.0,
+      "total_ops": 5032,
+      "throughput_qps": 335.47,
+      "n": 5032,
+      "p50_ms": 106.237,
+      "p95_ms": 126.075,
+      "p99_ms": 143.256,
+      "mean_ms": 109.078,
+      "min_ms": 99.797,
+      "max_ms": 419.115
+    }
+  }
+}

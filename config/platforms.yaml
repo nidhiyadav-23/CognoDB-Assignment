@@ -1,0 +1,86 @@
+# Registry of platforms under test. Adding a platform = adding an entry here
+# (plus an adapter if it's not already Bolt/Cypher, openCypher, or AQL).
+#
+# "advertised_specs" is filled in manually from each platform's published free/entry
+# tier docs and is reproduced verbatim in the README fairness table. Keep it honest:
+# if a platform doesn't publish exact numbers, say so instead of guessing.
+
+platforms:
+  - id: cognodb
+    display_name: "CognoDB Cloud (c0 free)"
+    adapter: bolt_cypher
+    env_prefix: COGNODB
+    query_dialect: cypher
+    advertised_specs:
+      vcpu: "0.5 (burstable)"
+      ram: "256 MB"
+      storage: "1 GB"
+      region: "user-selected at signup"
+      notes: "Free tier, one instance per workspace."
+
+  - id: neo4j_aura_free
+    display_name: "Neo4j Aura Free"
+    adapter: bolt_cypher
+    env_prefix: AURA
+    query_dialect: cypher
+    advertised_specs:
+      vcpu: "shared (not published as a fixed core count)"
+      ram: "1 GB"
+      storage: "~0.5 GB usable (Aura Free 2024 spec, verify at time of run)"
+      region: "user-selected at signup"
+      notes: "Free tier auto-pauses after inactivity; excluded from cold-start comparisons unless noted."
+
+  - id: neo4j_plus
+    display_name: "Neo4j+ (self-managed, capped)"
+    adapter: bolt_cypher
+    env_prefix: NEO4J_PLUS
+    query_dialect: cypher
+    advertised_specs:
+      vcpu: "0.5 (container-capped to match CognoDB free tier)"
+      ram: "256 MB (container-capped)"
+      storage: "1 GB (volume-capped)"
+      region: "same client region as other platforms"
+      notes: "Self-hosted Neo4j Community, explicitly resource-capped via container limits to match the smallest tier (see docker-compose.neo4j-plus.yml)."
+
+  - id: memgraph_cloud
+    display_name: "Memgraph Cloud"
+    adapter: bolt_cypher
+    env_prefix: MEMGRAPH
+    query_dialect: cypher
+    advertised_specs:
+      vcpu: "shared entry tier (record actual value from console at run time)"
+      ram: "record actual value from console at run time"
+      storage: "record actual value from console at run time"
+      region: "user-selected at signup"
+      notes: "Uses Cypher over Bolt; in-memory engine by default which is a real architectural difference worth calling out in the analysis, not hidden."
+
+  - id: neptune
+    display_name: "Amazon Neptune (min-capacity Serverless)"
+    adapter: neptune_opencypher
+    env_prefix: NEPTUNE
+    query_dialect: opencypher
+    advertised_specs:
+      vcpu: "Neptune Capacity Units (NCU) - min 1 NCU, no direct vCPU/RAM figure published"
+      ram: "not directly published per NCU; record min NCU cost from AWS pricing page"
+      storage: "pay-per-GB, effectively unbounded - cap dataset size, not storage"
+      region: "must match client region for fair network latency"
+      notes: "No free tier; use minimum Neptune Serverless capacity (0.5-1 NCU) and note the cost/resource asymmetry explicitly - this is a documented fairness caveat, not a hidden one."
+
+  - id: arangodb_oasis
+    display_name: "ArangoDB Oasis (free trial)"
+    adapter: arango_aql
+    env_prefix: ARANGO
+    query_dialect: aql
+    advertised_specs:
+      vcpu: "2 (Oasis free trial entry node, verify at signup time)"
+      ram: "4 GB (Oasis free trial entry node, verify at signup time)"
+      storage: "10 GB (Oasis free trial entry node, verify at signup time)"
+      region: "user-selected at signup"
+      notes: "Free trial is intentionally larger than CognoDB's c0 tier - documented as a fairness caveat; consider also running self-hosted ArangoDB capped to 256MB/0.5vCPU as an apples-to-apples supplementary run."
+
+benchmark:
+  dataset_relationships_target_min: 100000
+  dataset_relationships_target_max: 500000
+  read_iterations: 100
+  warmup_iterations: 20
+  concurrency_levels: [1, 10, 40]
